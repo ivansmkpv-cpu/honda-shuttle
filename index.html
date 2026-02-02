@@ -1,0 +1,385 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Honda Shuttle Request</title>
+
+  <style>
+    :root { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; }
+    body { margin:0; background:#f6f7f9; color:#111; }
+    .wrap { max-width: 760px; margin: 0 auto; padding: 16px; }
+    .card { background:#fff; border-radius:14px; padding:16px; box-shadow:0 8px 30px rgba(0,0,0,.08); }
+    h1 { font-size:20px; margin:0 0 12px; }
+
+    .row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+    @media (max-width:640px){ .row{grid-template-columns:1fr;} }
+
+    label { display:block; font-size:12px; color:#444; margin:10px 0 6px; }
+    input, textarea, select {
+      width:100%;
+      padding:12px;
+      border:1px solid #d9dde3;
+      border-radius:10px;
+      font-size:14px;
+      box-sizing:border-box;
+      background:#fff;
+    }
+
+    .radio { display:flex; gap:12px; padding:10px 0; flex-wrap:wrap; }
+    .radio label { font-size:14px; color:#111; }
+
+    .inline { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-top:10px; }
+    .inline input[type="checkbox"]{ width:auto; }
+
+    .btnbar { margin-top:14px; display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+
+    button {
+      border:0; border-radius:12px; padding:12px 16px;
+      font-weight:650; cursor:pointer;
+    }
+    .primary { background:#111; color:#fff; }
+    .secondary { background:#e9eef6; color:#111; }
+
+    .result {
+      margin-top:14px; padding:12px; border-radius:12px;
+      background:#f1f5ff; border:1px solid #dbe7ff; display:none;
+    }
+    .error {
+      margin-top:14px; padding:12px; border-radius:12px;
+      background:#fff1f2; border:1px solid #ffd1d8; display:none;
+    }
+    .hint { font-size:12px; color:#666; margin-top:6px; }
+
+    /* Modal */
+    .modalBack {
+      position:fixed; inset:0; background:rgba(0,0,0,.55);
+      display:none; align-items:center; justify-content:center; padding:16px;
+      z-index: 9999;
+    }
+    .modal {
+      max-width:520px; width:100%;
+      background:#fff; border-radius:16px; padding:16px;
+      box-shadow:0 12px 40px rgba(0,0,0,.25);
+    }
+    .modal h2 { margin:0 0 10px; }
+    .modal p { margin:0 0 12px; color:#333; }
+  </style>
+
+  <script>
+    // ✅ MUST be global for Google callback
+    window.mapsUrl = "";
+    window.initPlacesAutocomplete = function () {
+      try {
+        const locationInput = document.getElementById("locationText");
+        if (!locationInput) return;
+
+        // If google not available, do nothing (still allows typing)
+        if (!window.google || !google.maps || !google.maps.places) return;
+
+        const autocomplete = new google.maps.places.Autocomplete(locationInput, {
+          fields: ["place_id", "formatted_address", "geometry", "name"],
+          componentRestrictions: { country: ["us"] }
+        });
+
+        autocomplete.addListener("place_changed", () => {
+          const place = autocomplete.getPlace();
+          if (!place || !place.place_id) return;
+
+          const placeId = place.place_id;
+          const placeIdEl = document.getElementById("placeId");
+          const latEl = document.getElementById("lat");
+          const lngEl = document.getElementById("lng");
+
+          if (placeIdEl) placeIdEl.value = placeId;
+
+          let lat = "";
+          let lng = "";
+
+          if (place.geometry && place.geometry.location) {
+            lat = place.geometry.location.lat();
+            lng = place.geometry.location.lng();
+            if (latEl) latEl.value = lat;
+            if (lngEl) lngEl.value = lng;
+          }
+
+          if (place.formatted_address) {
+            locationInput.value = place.formatted_address;
+          } else if (place.name) {
+            locationInput.value = place.name;
+          }
+
+          if (lat && lng) {
+            window.mapsUrl =
+              `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(lat + "," + lng)}&query_place_id=${encodeURIComponent(placeId)}`;
+          } else {
+            window.mapsUrl =
+              `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(locationInput.value)}&query_place_id=${encodeURIComponent(placeId)}`;
+          }
+        });
+
+      } catch (e) {
+        // If anything fails, user can STILL type manually
+        console.warn("Places init failed:", e);
+      }
+    };
+  </script>
+
+  <!-- ✅ Google Maps with callback so Autocomplete loads correctly -->
+  <script
+    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCOlq83FAtR-LVTF4D_haQRyngHuk_kyG4l&libraries=places&v=weekly&callback=initPlacesAutocomplete"
+    async defer
+  ></script>
+</head>
+
+<body>
+
+<!-- POPUP #1: IMPORTANT NOTICE -->
+<div class="modalBack" id="noticeBack" style="display:flex;">
+  <div class="modal">
+    <h2>Important</h2>
+    <p>Please stay within <b>15 minutes</b> of the dealership for this free shuttle service.</p>
+    <div class="btnbar">
+      <button class="primary" id="noticeOk" type="button">I Understand</button>
+    </div>
+    <div class="hint">If you need urgent pickup, please speak with your service advisor.</div>
+  </div>
+</div>
+
+<!-- POPUP #2: CONFIRMATION -->
+<div class="modalBack" id="confirmBack">
+  <div class="modal">
+    <h2>Request Received ✅</h2>
+    <p id="confirmMsg"></p>
+    <div class="btnbar">
+      <button class="primary" id="confirmOk" type="button">OK</button>
+      <a id="trackLink" href="#" target="_blank" style="text-decoration:none; display:none;">
+        <button class="secondary" type="button">Track Status</button>
+      </a>
+    </div>
+    <div class="hint">This page updates when the cashier marks your request as Dispatched or Completed.</div>
+  </div>
+</div>
+
+<div class="wrap">
+  <div class="card">
+    <h1>Honda Shuttle Request</h1>
+
+    <iframe name="hidden_iframe" id="hidden_iframe" style="display:none;"></iframe>
+
+    <form id="shuttleForm" target="hidden_iframe" method="POST">
+      <div class="radio" role="group" aria-label="Branch">
+        <label><input type="radio" name="branchType" value="Valley Honda" checked> Valley Honda</label>
+        <label><input type="radio" name="branchType" value="Pickup"> Pickup</label>
+      </div>
+
+      <div class="row">
+        <div>
+          <label>Last name</label>
+          <input id="lastName" placeholder="Smith" required />
+        </div>
+        <div>
+          <label>Phone number</label>
+          <input id="phone" placeholder="+1 555 555 5555" required />
+        </div>
+      </div>
+
+      <div class="row">
+        <div>
+          <label>Advisor</label>
+          <select id="advisor" required>
+            <option value="" selected disabled>Select advisor...</option>
+            <option>Andrew Arguello</option>
+            <option>Jose Barrera</option>
+            <option>Edgar Beltran</option>
+            <option>John Benac</option>
+            <option>Anthony Bustamante</option>
+            <option>Alonzo Carrillo</option>
+            <option>Kevin Heffernan</option>
+            <option>Jose Jimenez</option>
+            <option>Durbek Kamolov</option>
+            <option>Marco Maldonado</option>
+            <option>Daniel Monjaraz</option>
+            <option>Holly Pierson</option>
+            <option>Kristina Pszotka</option>
+            <option>German Zamudio</option>
+            <option>Gianna Feliciano</option>
+            <option>Yolanda Gonzalez</option>
+            <option>Kathi Barczak</option>
+            <option>Arvie Vizcarra</option>
+            <option>Rosina Willie</option>
+          </select>
+        </div>
+
+        <div>
+          <label>Pickup time (optional)</label>
+          <input id="requestedTime" type="datetime-local" />
+          <div class="hint">Optional — you can leave this blank.</div>
+        </div>
+      </div>
+
+      <div class="row">
+        <div>
+          <label>Passengers</label>
+          <select id="passengers" required>
+            <option value="1" selected>1</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+          </select>
+        </div>
+
+        <div>
+          <label>Child seat (under 8)</label>
+          <div class="inline">
+            <input type="checkbox" id="childSeat" />
+            <span>Yes, requires a child seat</span>
+          </div>
+        </div>
+      </div>
+
+      <label>Location</label>
+      <input id="locationText" placeholder="Start typing an address..." autocomplete="off" required />
+      <div class="hint">Pick an address from the suggestions to generate a Maps link automatically.</div>
+
+      <label>Pickup note (optional)</label>
+      <textarea id="pickupNote" rows="3" placeholder="Gate 4, mall entrance, etc."></textarea>
+
+      <input type="hidden" name="payload" id="payload" />
+      <input type="hidden" id="placeId" />
+      <input type="hidden" id="lat" />
+      <input type="hidden" id="lng" />
+
+      <div class="btnbar">
+        <button class="primary" id="submitBtn" type="submit">Submit Request</button>
+      </div>
+
+      <div class="result" id="result"></div>
+      <div class="error" id="error"></div>
+    </form>
+  </div>
+</div>
+
+<script>
+  const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyCkVRowUcOcwYJ1B_i6vvPea_fIk3sU70V1d1GtMl8d4l9LEhn7Nlun6EJLkCqOGAUkA/exec";
+
+  const form = document.getElementById("shuttleForm");
+  const payloadEl = document.getElementById("payload");
+  const submitBtn = document.getElementById("submitBtn");
+  const resultEl = document.getElementById("result");
+  const errorEl = document.getElementById("error");
+
+  // Notice modal
+  const noticeBack = document.getElementById("noticeBack");
+  document.getElementById("noticeOk").addEventListener("click", () => {
+    noticeBack.style.display = "none";
+  });
+
+  // Confirmation modal
+  const confirmBack = document.getElementById("confirmBack");
+  const confirmMsg = document.getElementById("confirmMsg");
+  const confirmOk = document.getElementById("confirmOk");
+  const trackLink = document.getElementById("trackLink");
+  confirmOk.addEventListener("click", () => {
+    confirmBack.style.display = "none";
+  });
+
+  form.action = SCRIPT_URL;
+
+  function showError(msg){
+    errorEl.style.display = "block";
+    errorEl.textContent = msg;
+    resultEl.style.display = "none";
+  }
+
+  function showResult(msg){
+    resultEl.style.display = "block";
+    resultEl.innerHTML = msg;
+    errorEl.style.display = "none";
+  }
+
+  function toISO(v){ return new Date(v).toISOString(); }
+
+  // Receive response from Apps Script iframe
+  window.addEventListener("message", (event) => {
+    const data = event.data;
+    if (!data || typeof data !== "object") return;
+
+    submitBtn.disabled = false;
+    submitBtn.textContent = "Submit Request";
+
+    if (!data.ok) {
+      showError(data.error || "Submission failed.");
+      return;
+    }
+
+    const pos = data.position ?? "?";
+    const eta = data.eta_minutes ?? "?";
+
+    confirmMsg.innerHTML = `
+      <b>You are #${pos} in line.</b><br>
+      Estimated wait time: <b>~${eta} minutes</b>.
+    `;
+
+    if (data.tracking_url) {
+      trackLink.href = data.tracking_url;
+      trackLink.style.display = "inline-block";
+    } else {
+      trackLink.style.display = "none";
+    }
+
+    confirmBack.style.display = "flex";
+
+    // Reset
+    form.reset();
+    document.getElementById("placeId").value = "";
+    document.getElementById("lat").value = "";
+    document.getElementById("lng").value = "";
+    window.mapsUrl = "";
+    const defaultBranch = document.querySelector('input[name="branchType"][value="Valley Honda"]');
+    if (defaultBranch) defaultBranch.checked = true;
+  });
+
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+
+    const locationText = document.getElementById("locationText").value.trim();
+
+    // fallback maps url if user typed manually
+    if (!window.mapsUrl && locationText) {
+      window.mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(locationText)}`;
+    }
+
+    const payload = {
+      branchType: document.querySelector("input[name='branchType']:checked")?.value || "Valley Honda",
+      lastName: document.getElementById("lastName").value.trim(),
+      phone: document.getElementById("phone").value.trim(),
+      advisor: document.getElementById("advisor").value,
+      locationText,
+      pickupNote: document.getElementById("pickupNote").value.trim(),
+      requestedTimeISO: document.getElementById("requestedTime").value
+        ? toISO(document.getElementById("requestedTime").value)
+        : null,
+      passengers: Number(document.getElementById("passengers").value || 1),
+      childSeat: document.getElementById("childSeat").checked,
+
+      mapsUrl: window.mapsUrl || ""
+    };
+
+    if (!payload.lastName || !payload.phone || !payload.advisor || !payload.locationText) {
+      showError("Please complete all required fields.");
+      return;
+    }
+
+    payloadEl.value = JSON.stringify(payload);
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = "Submitting...";
+    showResult("Submitting your request...");
+
+    form.submit();
+  });
+</script>
+
+</body>
+</html>
