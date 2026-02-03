@@ -115,7 +115,6 @@
   </script>
 
   <!-- Google Maps JS + Places -->
-  <!-- NOTE: Your key must have: Maps JavaScript API + Places API enabled + Billing enabled -->
   <script
     src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCOlq83FAtR-LVTF4D_haQRyngHuk_kyG4&libraries=places&v=weekly&callback=initPlacesAutocomplete"
     async defer
@@ -136,7 +135,7 @@
   </div>
 </div>
 
-<!-- POPUP #2: CONFIRMATION -->
+<!-- POPUP #2: SUCCESS CONFIRMATION -->
 <div class="modalBack" id="confirmBack">
   <div class="modal">
     <h2>Request Received ✅</h2>
@@ -147,7 +146,7 @@
         <button class="secondary" type="button">Track Status</button>
       </a>
     </div>
-    <div class="hint">This page updates when the cashier marks your request as Dispatched or Completed.</div>
+    <div class="hint">Thank you. If you need urgent pickup, please speak with your service advisor.</div>
   </div>
 </div>
 
@@ -286,13 +285,14 @@
 
   function toISO(v){ return new Date(v).toISOString(); }
 
-  // ✅ Only accept postMessage that looks like our server response
+  // ✅ When Apps Script replies via postMessage
   window.addEventListener("message", (event) => {
     const data = event.data;
 
-    // IMPORTANT: ignore random messages from other scripts
+    // ignore random messages
     if (!data || typeof data !== "object" || !("ok" in data)) return;
 
+    // Always release UI from "Submitting..."
     submitBtn.disabled = false;
     submitBtn.textContent = "Submit Request";
 
@@ -301,14 +301,13 @@
       return;
     }
 
-    const pos = data.position ?? "?";
-    const eta = data.eta_minutes ?? "?";
-
+    // ✅ Your requested popup message (English - US)
     confirmMsg.innerHTML = `
-      <b>You are #${pos} in line.</b><br>
-      Estimated wait time: <b>~${eta} minutes</b>.
+      <b>Your request was submitted successfully.</b><br>
+      A driver will contact you shortly, typically within <b>5–10 minutes</b>.
     `;
 
+    // Keep track link optional (if you still want it)
     if (data.tracking_url) {
       trackLink.href = data.tracking_url;
       trackLink.style.display = "inline-block";
@@ -316,7 +315,14 @@
       trackLink.style.display = "none";
     }
 
+    // Show popup
     confirmBack.style.display = "flex";
+
+    // Clear the "Submitting your request..." box
+    resultEl.style.display = "none";
+    resultEl.innerHTML = "";
+    errorEl.style.display = "none";
+    errorEl.textContent = "";
 
     // Reset form + maps memory
     form.reset();
@@ -370,5 +376,3 @@
 
 </body>
 </html>
-
-
