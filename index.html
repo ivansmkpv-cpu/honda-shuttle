@@ -17,9 +17,15 @@
 
     label { display:block; font-size:12px; color:#444; margin:10px 0 6px; }
     input, textarea, select {
-      width:100%; padding:12px; border:1px solid #d9dde3; border-radius:10px;
-      font-size:14px; box-sizing:border-box; background:#fff;
+      width:100%;
+      padding:12px;
+      border:1px solid #d9dde3;
+      border-radius:10px;
+      font-size:14px;
+      box-sizing:border-box;
+      background:#fff;
     }
+
     .radio { display:flex; gap:12px; padding:10px 0; flex-wrap:wrap; }
     .radio label { font-size:14px; color:#111; }
 
@@ -28,15 +34,21 @@
 
     .btnbar { margin-top:14px; display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
 
-    button { border:0; border-radius:12px; padding:12px 16px; font-weight:650; cursor:pointer; }
+    button {
+      border:0; border-radius:12px; padding:12px 16px;
+      font-weight:650; cursor:pointer;
+    }
     .primary { background:#111; color:#fff; }
     .secondary { background:#e9eef6; color:#111; }
 
-    .result, .error {
-      margin-top:14px; padding:12px; border-radius:12px; display:none;
+    .result {
+      margin-top:14px; padding:12px; border-radius:12px;
+      background:#f1f5ff; border:1px solid #dbe7ff; display:none;
     }
-    .result { background:#f1f5ff; border:1px solid #dbe7ff; }
-    .error { background:#fff1f2; border:1px solid #ffd1d8; }
+    .error {
+      margin-top:14px; padding:12px; border-radius:12px;
+      background:#fff1f2; border:1px solid #ffd1d8; display:none;
+    }
     .hint { font-size:12px; color:#666; margin-top:6px; }
 
     .modalBack {
@@ -54,55 +66,65 @@
   </style>
 
   <script>
-    // Global for callback
+    // Google Places Autocomplete (US only)
     window.mapsUrl = "";
+    window.placeSelected = false;
+
     window.initPlacesAutocomplete = function () {
-      const locationInput = document.getElementById("locationText");
-      if (!locationInput) return;
+      try {
+        const locationInput = document.getElementById("locationText");
+        if (!locationInput) return;
 
-      // If Google didn't load, still allow typing
-      if (!window.google || !google.maps || !google.maps.places) return;
+        // If Google didn't load, keep normal typing enabled.
+        if (!window.google || !google.maps || !google.maps.places) return;
 
-      const autocomplete = new google.maps.places.Autocomplete(locationInput, {
-        fields: ["place_id", "formatted_address", "geometry", "name"],
-        componentRestrictions: { country: ["us"] }
-      });
+        const autocomplete = new google.maps.places.Autocomplete(locationInput, {
+          fields: ["place_id", "formatted_address", "geometry", "name"],
+          componentRestrictions: { country: ["us"] }
+        });
 
-      autocomplete.addListener("place_changed", () => {
-        const place = autocomplete.getPlace();
-        if (!place || !place.place_id) return;
+        autocomplete.addListener("place_changed", () => {
+          const place = autocomplete.getPlace();
+          if (!place || !place.place_id) return;
 
-        const placeId = place.place_id;
+          window.placeSelected = true;
 
-        let lat = "", lng = "";
-        if (place.geometry && place.geometry.location) {
-          lat = place.geometry.location.lat();
-          lng = place.geometry.location.lng();
-        }
+          const placeId = place.place_id;
+          const lat = place.geometry?.location?.lat?.();
+          const lng = place.geometry?.location?.lng?.();
 
-        if (place.formatted_address) locationInput.value = place.formatted_address;
-        else if (place.name) locationInput.value = place.name;
+          if (place.formatted_address) {
+            locationInput.value = place.formatted_address;
+          } else if (place.name) {
+            locationInput.value = place.name;
+          }
 
-        if (lat && lng) {
-          window.mapsUrl =
-            `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(lat + "," + lng)}&query_place_id=${encodeURIComponent(placeId)}`;
-        } else {
-          window.mapsUrl =
-            `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(locationInput.value)}&query_place_id=${encodeURIComponent(placeId)}`;
-        }
-      });
+          if (lat && lng) {
+            window.mapsUrl =
+              `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(lat + "," + lng)}&query_place_id=${encodeURIComponent(placeId)}`;
+          } else {
+            window.mapsUrl =
+              `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(locationInput.value)}&query_place_id=${encodeURIComponent(placeId)}`;
+          }
+        });
+
+      } catch (e) {
+        console.warn("Places init failed:", e);
+      }
     };
   </script>
 
-  <!-- Google Maps (Places) -->
+  <!-- Google Maps JS + Places -->
+  <!-- NOTE: Your key must have: Maps JavaScript API + Places API enabled + Billing enabled -->
   <script
-    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCOlq83FAtR-LVTF4D_haQRyngHuk_kyG4l&libraries=places&v=weekly&callback=initPlacesAutocomplete"
-    async defer></script>
+    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCOlq83FAtR-LVTF4D_haQRyngHuk_kyG4&libraries=places&v=weekly&callback=initPlacesAutocomplete"
+    async defer
+  ></script>
 </head>
 
 <body>
 
-<!-- Notice modal -->
+<!-- POPUP #1: IMPORTANT NOTICE -->
 <div class="modalBack" id="noticeBack" style="display:flex;">
   <div class="modal">
     <h2>Important</h2>
@@ -114,7 +136,7 @@
   </div>
 </div>
 
-<!-- Confirmation modal -->
+<!-- POPUP #2: CONFIRMATION -->
 <div class="modalBack" id="confirmBack">
   <div class="modal">
     <h2>Request Received ✅</h2>
@@ -226,8 +248,8 @@
 </div>
 
 <script>
-  // ✅ your Apps Script Web App
-  const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyzNPt620iG8KSelt0z1cUDOB3wpdHBQKDU-8eLVG77qrf1lgr9Y-ZYmIG296nIQxJXHQ/exec";
+  // ✅ Your Apps Script Web App URL
+  const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxyDJpnJJCZYR8p26T57dIGiOP8XxqTYroaKvB8s5xAmSYlHivyzS8BphAIYmS6wDSoAQ/exec";
 
   const form = document.getElementById("shuttleForm");
   const payloadEl = document.getElementById("payload");
@@ -237,13 +259,16 @@
 
   // Notice modal
   const noticeBack = document.getElementById("noticeBack");
-  document.getElementById("noticeOk").addEventListener("click", () => noticeBack.style.display = "none");
+  document.getElementById("noticeOk").addEventListener("click", () => {
+    noticeBack.style.display = "none";
+  });
 
   // Confirmation modal
   const confirmBack = document.getElementById("confirmBack");
   const confirmMsg = document.getElementById("confirmMsg");
+  const confirmOk = document.getElementById("confirmOk");
   const trackLink = document.getElementById("trackLink");
-  document.getElementById("confirmOk").addEventListener("click", () => confirmBack.style.display = "none");
+  confirmOk.addEventListener("click", () => confirmBack.style.display = "none");
 
   form.action = SCRIPT_URL;
 
@@ -261,10 +286,12 @@
 
   function toISO(v){ return new Date(v).toISOString(); }
 
-  // Receive response from Apps Script iframe
+  // ✅ Only accept postMessage that looks like our server response
   window.addEventListener("message", (event) => {
     const data = event.data;
-    if (!data || typeof data !== "object") return;
+
+    // IMPORTANT: ignore random messages from other scripts
+    if (!data || typeof data !== "object" || !("ok" in data)) return;
 
     submitBtn.disabled = false;
     submitBtn.textContent = "Submit Request";
@@ -277,7 +304,10 @@
     const pos = data.position ?? "?";
     const eta = data.eta_minutes ?? "?";
 
-    confirmMsg.innerHTML = `<b>You are #${pos} in line.</b><br>Estimated wait time: <b>~${eta} minutes</b>.`;
+    confirmMsg.innerHTML = `
+      <b>You are #${pos} in line.</b><br>
+      Estimated wait time: <b>~${eta} minutes</b>.
+    `;
 
     if (data.tracking_url) {
       trackLink.href = data.tracking_url;
@@ -288,13 +318,14 @@
 
     confirmBack.style.display = "flex";
 
-    // Reset form after success
+    // Reset form + maps memory
     form.reset();
     window.mapsUrl = "";
+    window.placeSelected = false;
+
+    // Default radio back to Valley Honda
     const defaultBranch = document.querySelector('input[name="branchType"][value="Valley Honda"]');
     if (defaultBranch) defaultBranch.checked = true;
-
-    showResult(""); // clear “Submitting…” box
   });
 
   form.addEventListener("submit", (event) => {
@@ -302,7 +333,7 @@
 
     const locationText = document.getElementById("locationText").value.trim();
 
-    // fallback maps url if user typed manually
+    // If user typed manually (no selection), still create a maps link
     if (!window.mapsUrl && locationText) {
       window.mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(locationText)}`;
     }
@@ -314,7 +345,9 @@
       advisor: document.getElementById("advisor").value,
       locationText,
       pickupNote: document.getElementById("pickupNote").value.trim(),
-      requestedTimeISO: document.getElementById("requestedTime").value ? toISO(document.getElementById("requestedTime").value) : null,
+      requestedTimeISO: document.getElementById("requestedTime").value
+        ? toISO(document.getElementById("requestedTime").value)
+        : null,
       passengers: Number(document.getElementById("passengers").value || 1),
       childSeat: document.getElementById("childSeat").checked,
       mapsUrl: window.mapsUrl || ""
